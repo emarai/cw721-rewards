@@ -6,7 +6,7 @@ use cw721_rewards::{ExecuteMsg, InstantiateMsg, QueryMsg};
 fn main() {
     write_api! {
         instantiate: InstantiateMsg,
-        execute: ExecuteMsg<Empty, Empty>,
+        execute: ExecuteMsg<Empty>,
         query: QueryMsg<Empty>,
     }
 }

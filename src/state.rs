@@ -8,6 +8,8 @@ use cosmwasm_std::{Addr, BlockInfo, CustomMsg, StdResult, Storage};
 use cw721::{ContractInfoResponse, Cw721, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
+use crate::msg::MintConfig;
+
 pub struct Cw721Contract<'a, T, C, E, Q>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -15,11 +17,13 @@ where
     E: CustomMsg,
 {
     pub contract_info: Item<'a, ContractInfoResponse>,
+    pub mint_config: Item<'a, MintConfig>,
     pub token_count: Item<'a, u64>,
     /// Stored as (granter, operator) giving operator full control over granter's account
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
     pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
 
+    pub(crate) _custom_extension: PhantomData<T>,
     pub(crate) _custom_response: PhantomData<C>,
     pub(crate) _custom_query: PhantomData<Q>,
     pub(crate) _custom_execute: PhantomData<E>,
@@ -48,6 +52,7 @@ where
             "operators",
             "tokens",
             "tokens__owner",
+            "mint_config",
         )
     }
 }
@@ -64,6 +69,7 @@ where
         operator_key: &'a str,
         tokens_key: &'a str,
         tokens_owner_key: &'a str,
+        mint_config_key: &'a str,
     ) -> Self {
         let indexes = TokenIndexes {
             owner: MultiIndex::new(token_owner_idx, tokens_key, tokens_owner_key),
@@ -73,6 +79,8 @@ where
             token_count: Item::new(token_count_key),
             operators: Map::new(operator_key),
             tokens: IndexedMap::new(tokens_key, indexes),
+            mint_config: Item::new(mint_config_key),
+            _custom_extension: PhantomData,
             _custom_response: PhantomData,
             _custom_execute: PhantomData,
             _custom_query: PhantomData,
@@ -108,7 +116,6 @@ pub struct TokenInfo<T> {
     /// Metadata JSON Schema
     pub token_uri: Option<String>,
 
-    /// You can add any custom metadata here when you extend cw721-base
     pub extension: T,
 }
 

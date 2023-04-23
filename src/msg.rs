@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Binary;
 use cw721::Expiration;
@@ -10,11 +12,8 @@ pub struct InstantiateMsg {
     pub name: String,
     /// Symbol of the NFT contract
     pub symbol: String,
-
-    /// The minter is the only one who can create new NFTs.
-    /// This is designed for a base NFT that is controlled by an external program
-    /// or contract. You will likely replace this with custom logic in custom NFTs
-    pub minter: String,
+    pub max_supply: u32,
+    pub token_uri: String,
 }
 
 /// This is like Cw721ExecuteMsg but we add a Mint command for an owner
@@ -22,7 +21,7 @@ pub struct InstantiateMsg {
 /// use other control logic in any contract that inherits this.
 #[cw_ownable_execute]
 #[cw_serde]
-pub enum ExecuteMsg<T, E> {
+pub enum ExecuteMsg<T> {
     /// Transfer is a base message to move a token to another account without triggering actions
     TransferNft { recipient: String, token_id: String },
     /// Send is a base message to transfer a token to a contract and trigger an action
@@ -51,24 +50,10 @@ pub enum ExecuteMsg<T, E> {
     RevokeAll { operator: String },
 
     /// Mint a new NFT, can only be called by the contract minter
-    Mint {
-        /// Unique ID of the NFT
-        token_id: String,
-        /// The owner of the newly minter NFT
-        owner: String,
-        /// Universal resource identifier for this NFT
-        /// Should point to a JSON file that conforms to the ERC721
-        /// Metadata JSON Schema
-        token_uri: Option<String>,
-        /// Any custom extension used by this contract
-        extension: T,
-    },
+    Mint { extension: T },
 
     /// Burn an NFT the sender has access to
     Burn { token_id: String },
-
-    /// Extension msg
-    Extension { msg: E },
 }
 
 #[cw_ownable_query]
@@ -163,4 +148,10 @@ pub enum QueryMsg<Q: JsonSchema> {
 #[cw_serde]
 pub struct MinterResponse {
     pub minter: Option<String>,
+}
+
+#[cw_serde]
+pub struct MintConfig {
+    pub max_supply: u32,
+    pub token_uri: String,
 }

@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use cw_ownable::OwnershipError;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -7,7 +9,7 @@ use cosmwasm_std::{Binary, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response,
 use cw721::{ContractInfoResponse, Cw721Execute, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MintConfig};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
 
 impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
@@ -21,16 +23,24 @@ where
         &self,
         deps: DepsMut,
         _env: Env,
-        _info: MessageInfo,
+        info: MessageInfo,
         msg: InstantiateMsg,
     ) -> StdResult<Response<C>> {
+        let minter = info.sender.clone();
         let info = ContractInfoResponse {
             name: msg.name,
             symbol: msg.symbol,
         };
         self.contract_info.save(deps.storage, &info)?;
 
-        cw_ownable::initialize_owner(deps.storage, deps.api, Some(&msg.minter))?;
+        let mint_config = MintConfig {
+            max_supply: msg.max_supply,
+            token_uri: msg.token_uri,
+        };
+
+        self.mint_config.save(deps.storage, &mint_config);
+
+        cw_ownable::initialize_owner(deps.storage, deps.api, Some(&minter.as_str()))?;
 
         Ok(Response::default())
     }
@@ -40,15 +50,10 @@ where
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: ExecuteMsg<T, E>,
+        msg: ExecuteMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         match msg {
-            ExecuteMsg::Mint {
-                token_id,
-                owner,
-                token_uri,
-                extension,
-            } => self.mint(deps, info, token_id, owner, token_uri, extension),
+            ExecuteMsg::Mint { extension } => self.mint(deps, info, extension),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -72,7 +77,6 @@ where
             } => self.send_nft(deps, env, info, contract, token_id, msg),
             ExecuteMsg::Burn { token_id } => self.burn(deps, env, info, token_id),
             ExecuteMsg::UpdateOwnership(action) => Self::update_ownership(deps, env, info, action),
-            ExecuteMsg::Extension { msg: _ } => Ok(Response::default()),
         }
     }
 }
@@ -89,22 +93,26 @@ where
         &self,
         deps: DepsMut,
         info: MessageInfo,
-        token_id: String,
-        owner: String,
-        token_uri: Option<String>,
         extension: T,
     ) -> Result<Response<C>, ContractError> {
-        cw_ownable::assert_owner(deps.storage, &info.sender)?;
-
         // create the token
+        let mint_config = self.mint_config.may_load(deps.storage)?.unwrap();
+
         let token = TokenInfo {
-            owner: deps.api.addr_validate(&owner)?,
+            owner: deps.api.addr_validate(&info.sender.as_str())?,
             approvals: vec![],
-            token_uri,
-            extension,
+            token_uri: Some(mint_config.token_uri),
+            extension: extension,
         };
+
+        let token_id = self.token_count(deps.storage)? + 1;
+
+        if token_id > mint_config.max_supply as u64 {
+            return Err(ContractError::MaxSupplyExceeded {});
+        }
+
         self.tokens
-            .update(deps.storage, &token_id, |old| match old {
+            .update(deps.storage, &token_id.to_string(), |old| match old {
                 Some(_) => Err(ContractError::Claimed {}),
                 None => Ok(token),
             })?;
@@ -113,9 +121,9 @@ where
 
         Ok(Response::new()
             .add_attribute("action", "mint")
-            .add_attribute("minter", info.sender)
-            .add_attribute("owner", owner)
-            .add_attribute("token_id", token_id))
+            .add_attribute("minter", info.sender.clone())
+            .add_attribute("owner", info.sender)
+            .add_attribute("token_id", token_id.to_string()))
     }
 
     pub fn update_ownership(

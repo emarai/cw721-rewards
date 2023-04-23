@@ -58,7 +58,7 @@ pub mod entry {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: ExecuteMsg<Extension, Empty>,
+        msg: ExecuteMsg<Extension>,
     ) -> Result<Response, ContractError> {
         let tract = Cw721Contract::<Extension, Empty, Empty, Empty>::default();
         tract.execute(deps, env, info, msg)
@@ -90,7 +90,8 @@ mod tests {
             InstantiateMsg {
                 name: "".into(),
                 symbol: "".into(),
-                minter: "larry".into(),
+                max_supply: 0,
+                token_uri: "".into(),
             },
         )
         .unwrap();

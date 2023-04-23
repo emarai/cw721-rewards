@@ -22,6 +22,9 @@ pub enum ContractError {
     #[error("Approval not found for: {spender}")]
     ApprovalNotFound { spender: String },
 
-    #[error("burn is not allowed")]
+    #[error("Burn is not allowed")]
     BurnNotAllowed {},
+
+    #[error("Max supply exceeded")]
+    MaxSupplyExceeded {},
 }
