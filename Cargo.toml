@@ -5,13 +5,13 @@ authors       = [
   "Ethan Frey <ethanfrey@users.noreply.github.com>",
   "Orkun Külçe <orkun@deuslabs.fi>",
 ]
-version       = { workspace = true }
-edition       = { workspace = true }
-license       = { workspace = true }
-repository    = { workspace = true }
-homepage      = { workspace = true }
-documentation = { workspace = true }
-rust-version  = { workspace = true }
+version       = "0.17.0"
+edition       = "2021"
+license       = "Apache-2.0"
+repository    = "https://github.com/CosmWasm/cw-nfts"
+homepage      = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
+rust-version  = "1.65"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -23,17 +23,17 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cosmwasm-schema = { workspace = true }
-cosmwasm-std    = { workspace = true }
-cw-ownable      = { workspace = true }
-cw-storage-plus = { workspace = true }
-cw-utils        = { workspace = true }
-cw2             = { workspace = true }
-cw721           = { workspace = true }
-cw721-base-016  = { workspace = true, features = ["library"] }
-schemars        = { workspace = true }
-serde           = { workspace = true }
-thiserror       = { workspace = true }
+cosmwasm-schema = "1.2.1"
+cosmwasm-std    = "1.2.1"
+cw2             = { git = "https://github.com/mars-protocol/cw-plus", rev = "1a3a944" }
+cw721-base-016  = { version = "0.16.0", package = "cw721-base" }
+cw-ownable      = "0.5.0"
+cw-storage-plus = "1.0.1"
+cw-utils        = "1.0.1"
+schemars        = "0.8.11"
+serde           = { version = "1.0.152", default-features = false, features = ["derive"] }
+thiserror       = "1.0.38"
+cw721           = { version = "0.17.0" }
 
 [dev-dependencies]
-cw-multi-test   = { workspace = true }
+cw-multi-test   = "0.16.2"
