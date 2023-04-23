@@ -384,7 +384,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw721-base"
+name = "cw721-rewards"
 version = "0.17.0"
 dependencies = [
  "cosmwasm-schema",
@@ -395,7 +395,7 @@ dependencies = [
  "cw-utils 1.0.1",
  "cw2 1.0.1 (git+https://github.com/mars-protocol/cw-plus?rev=1a3a944)",
  "cw721 0.17.0",
- "cw721-base 0.16.0",
+ "cw721-base",
  "schemars",
  "serde",
  "thiserror",

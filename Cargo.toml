@@ -1,9 +1,8 @@
 [package]
-name          = "cw721-base"
-description   = "Basic implementation cw721 NFTs"
+name          = "cw721-rewards"
+description   = "Archway reward distribution as default utility for cw721"
 authors       = [
-  "Ethan Frey <ethanfrey@users.noreply.github.com>",
-  "Orkun Külçe <orkun@deuslabs.fi>",
+  "irfi <irfi147@gmail.com",
 ]
 version       = "0.17.0"
 edition       = "2021"

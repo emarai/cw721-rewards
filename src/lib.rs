@@ -4,12 +4,9 @@ pub mod helpers;
 pub mod msg;
 mod query;
 pub mod state;
-mod upgrades;
 
 #[cfg(test)]
 mod contract_tests;
-#[cfg(test)]
-mod multi_tests;
 
 pub use crate::error::ContractError;
 pub use crate::msg::{ExecuteMsg, InstantiateMsg, MinterResponse, QueryMsg};
@@ -29,15 +26,12 @@ use cosmwasm_std::Empty;
 pub type Extension = Option<Empty>;
 
 // Version info for migration
-pub const CONTRACT_NAME: &str = "crates.io:cw721-base";
+pub const CONTRACT_NAME: &str = "crates.io:cw721-rewards";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // currently we only support migrating from 0.16.0. this is ok for now because
 // we have not released any 0.16.x where x != 0
 //
-// TODO: parse semvar so that any version 0.16.x can be migrated from
-pub const EXPECTED_FROM_VERSION: &str = "0.16.0";
-
 pub mod entry {
     use super::*;
 
@@ -74,19 +68,6 @@ pub mod entry {
     pub fn query(deps: Deps, env: Env, msg: QueryMsg<Empty>) -> StdResult<Binary> {
         let tract = Cw721Contract::<Extension, Empty, Empty, Empty>::default();
         tract.query(deps, env, msg)
-    }
-
-    #[cfg_attr(not(feature = "library"), entry_point)]
-    pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
-        // make sure the correct contract is being upgraded, and it's being
-        // upgraded from the correct version.
-        cw2::assert_contract_version(deps.as_ref().storage, CONTRACT_NAME, EXPECTED_FROM_VERSION)?;
-
-        // update contract version
-        cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-        // perform the upgrade
-        upgrades::v0_17::migrate::<Extension, Empty, Empty, Empty>(deps)
     }
 }
 
