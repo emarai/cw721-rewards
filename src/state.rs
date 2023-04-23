@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use cosmwasm_std::{Addr, BlockInfo, CustomMsg, StdResult, Storage};
 
-use cw721::{ContractInfoResponse, Cw721, Expiration};
+use cw721::{ContractInfoResponse, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 use crate::msg::MintConfig;
@@ -22,6 +22,7 @@ where
     /// Stored as (granter, operator) giving operator full control over granter's account
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
     pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
+    pub total_arch_reward: Item<'a, u128>,
 
     pub(crate) _custom_extension: PhantomData<T>,
     pub(crate) _custom_response: PhantomData<C>,
@@ -30,7 +31,7 @@ where
 }
 
 // This is a signal, the implementations are in other files
-impl<'a, T, C, E, Q> Cw721<T, C> for Cw721Contract<'a, T, C, E, Q>
+impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
 where
     T: Serialize + DeserializeOwned + Clone,
     C: CustomMsg,
@@ -53,6 +54,7 @@ where
             "tokens",
             "tokens__owner",
             "mint_config",
+            "total_arch_reward",
         )
     }
 }
@@ -70,6 +72,7 @@ where
         tokens_key: &'a str,
         tokens_owner_key: &'a str,
         mint_config_key: &'a str,
+        total_arch_reward_key: &'a str,
     ) -> Self {
         let indexes = TokenIndexes {
             owner: MultiIndex::new(token_owner_idx, tokens_key, tokens_owner_key),
@@ -80,11 +83,23 @@ where
             operators: Map::new(operator_key),
             tokens: IndexedMap::new(tokens_key, indexes),
             mint_config: Item::new(mint_config_key),
+            total_arch_reward: Item::new(total_arch_reward_key),
             _custom_extension: PhantomData,
             _custom_response: PhantomData,
             _custom_execute: PhantomData,
             _custom_query: PhantomData,
         }
+    }
+
+    pub fn add_total_arch_reward(&self, storage: &mut dyn Storage, add: u128) -> StdResult<u128> {
+        let mut val = self
+            .total_arch_reward
+            .may_load(storage)?
+            .unwrap_or_default();
+
+        val += add;
+        self.total_arch_reward.save(storage, &val)?;
+        Ok(val)
     }
 
     pub fn token_count(&self, storage: &dyn Storage) -> StdResult<u64> {
@@ -115,6 +130,8 @@ pub struct TokenInfo<T> {
     /// Should point to a JSON file that conforms to the ERC721
     /// Metadata JSON Schema
     pub token_uri: Option<String>,
+
+    pub reward_claimed: u128,
 
     pub extension: T,
 }

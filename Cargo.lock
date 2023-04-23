@@ -20,6 +20,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7de8ce5e0f9f8d88245311066a578d72b7af3e7088f32783804676302df237e4"
 
 [[package]]
+name = "archway-bindings"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f414afb8c39a93d817d459919cd0479a646936140c3ddaef162fa51ba9257092"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "base16ct"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -387,6 +400,7 @@ dependencies = [
 name = "cw721-rewards"
 version = "0.17.0"
 dependencies = [
+ "archway-bindings",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -398,6 +412,7 @@ dependencies = [
  "cw721-base",
  "schemars",
  "serde",
+ "serde-json-wasm",
  "thiserror",
 ]
 

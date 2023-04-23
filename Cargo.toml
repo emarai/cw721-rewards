@@ -33,6 +33,9 @@ schemars        = "0.8.11"
 serde           = { version = "1.0.152", default-features = false, features = ["derive"] }
 thiserror       = "1.0.38"
 cw721           = { version = "0.17.0" }
+archway-bindings = { version = "0.1.0" }
+serde-json-wasm = "0.5"
+
 
 [dev-dependencies]
 cw-multi-test   = "0.16.2"

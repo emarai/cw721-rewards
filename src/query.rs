@@ -13,7 +13,7 @@ use cw721::{
 use cw_storage_plus::Bound;
 use cw_utils::maybe_addr;
 
-use crate::msg::{MinterResponse, QueryMsg};
+use crate::msg::{MinterResponse, QueryMsg, TotalRewardResponse};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -319,6 +319,9 @@ where
                 to_binary(&self.approvals(deps, env, token_id, include_expired.unwrap_or(false))?)
             }
             QueryMsg::Ownership {} => to_binary(&Self::ownership(deps)?),
+            QueryMsg::TotalArchReward { token_id } => {
+                to_binary(&self.get_total_arch_rewards(deps, token_id)?)
+            }
             QueryMsg::Extension { msg: _ } => Ok(Binary::default()),
         }
     }
@@ -333,6 +336,32 @@ where
 
     pub fn ownership(deps: Deps) -> StdResult<cw_ownable::Ownership<Addr>> {
         cw_ownable::get_ownership(deps.storage)
+    }
+
+    pub fn get_total_arch_rewards(
+        &self,
+        deps: Deps,
+        token_id: Option<String>,
+    ) -> StdResult<TotalRewardResponse> {
+        let total_all = self
+            .total_arch_reward
+            .may_load(deps.storage)
+            .unwrap_or_default()
+            .unwrap();
+
+        return if let Some(token_id) = token_id {
+            let info = self.tokens.load(deps.storage, &token_id)?;
+
+            let mint_config = self.mint_config.load(deps.storage)?;
+
+            Ok(TotalRewardResponse {
+                total_arch_reward: total_all / mint_config.max_supply as u128 - info.reward_claimed,
+            })
+        } else {
+            Ok(TotalRewardResponse {
+                total_arch_reward: total_all,
+            })
+        };
     }
 }
 

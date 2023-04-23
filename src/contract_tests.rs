@@ -1,5 +1,4 @@
 #![cfg(test)]
-use std::char::MAX;
 
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 
@@ -765,7 +764,6 @@ fn approving_all_revoking_all() {
 fn query_tokens_by_owner() {
     let mut deps = mock_dependencies();
     let contract = setup_contract(deps.as_mut());
-    let minter = mock_info(MERLIN, &[]);
 
     // Mint a couple tokens (from the same owner)
     let token_id1 = "1".to_string();

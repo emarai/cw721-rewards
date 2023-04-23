@@ -1,16 +1,18 @@
-use std::marker::PhantomData;
-
+use archway_bindings::ArchwayMsg;
 use cw_ownable::OwnershipError;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Binary, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    coins, BankMsg, Binary, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
+};
 
-use cw721::{ContractInfoResponse, Cw721Execute, Cw721ReceiveMsg, Expiration};
+use cw721::{ContractInfoResponse, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintConfig};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
+use crate::{DENOM, REWARDS_WITHDRAW_REPLY};
 
 impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
 where
@@ -38,7 +40,7 @@ where
             token_uri: msg.token_uri,
         };
 
-        self.mint_config.save(deps.storage, &mint_config);
+        self.mint_config.save(deps.storage, &mint_config)?;
 
         cw_ownable::initialize_owner(deps.storage, deps.api, Some(&minter.as_str()))?;
 
@@ -51,7 +53,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: ExecuteMsg<T>,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         match msg {
             ExecuteMsg::Mint { extension } => self.mint(deps, info, extension),
             ExecuteMsg::Approve {
@@ -76,6 +78,10 @@ where
                 msg,
             } => self.send_nft(deps, env, info, contract, token_id, msg),
             ExecuteMsg::Burn { token_id } => self.burn(deps, env, info, token_id),
+            ExecuteMsg::WithdrawRewards {} => self.withdraw_rewards(),
+            ExecuteMsg::WithdrawTokenRewards { token_id } => {
+                self.withdraw_token_rewards(deps, env, info, token_id)
+            }
             ExecuteMsg::UpdateOwnership(action) => Self::update_ownership(deps, env, info, action),
         }
     }
@@ -94,7 +100,7 @@ where
         deps: DepsMut,
         info: MessageInfo,
         extension: T,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         // create the token
         let mint_config = self.mint_config.may_load(deps.storage)?.unwrap();
 
@@ -102,6 +108,7 @@ where
             owner: deps.api.addr_validate(&info.sender.as_str())?,
             approvals: vec![],
             token_uri: Some(mint_config.token_uri),
+            reward_claimed: 0,
             extension: extension,
         };
 
@@ -131,21 +138,63 @@ where
         env: Env,
         info: MessageInfo,
         action: cw_ownable::Action,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         let ownership = cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
         Ok(Response::new().add_attributes(ownership.into_attributes()))
     }
+
+    pub fn withdraw_rewards(&self) -> Result<Response<ArchwayMsg>, ContractError> {
+        let msg = ArchwayMsg::withdraw_rewards_by_limit(0);
+
+        let res = Response::new()
+            .add_submessage(SubMsg::reply_on_success(msg, REWARDS_WITHDRAW_REPLY))
+            .add_attribute("method", "withdraw_rewards");
+
+        Ok(res)
+    }
+
+    pub fn withdraw_token_rewards(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        token_id: String,
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
+        let mut token = self.tokens.load(deps.storage, &token_id)?;
+        // ensure we have permissions
+        self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+
+        let available_to_claim = self
+            .get_total_arch_rewards(deps.as_ref(), Some(token_id.clone()))
+            .unwrap()
+            .total_arch_reward;
+
+        token.reward_claimed += available_to_claim;
+        self.tokens.save(deps.storage, &token_id, &token)?;
+
+        // transfer arch as msg
+
+        let msg = BankMsg::Send {
+            to_address: info.sender.to_string(),
+            amount: coins(available_to_claim, DENOM),
+        };
+
+        Ok(Response::new()
+            .add_message(msg)
+            .add_attribute("action", "withdraw_token_rewards")
+            .add_attribute("token_id", token_id)
+            .add_attribute("owner", info.sender)
+            .add_attribute("amount", available_to_claim.to_string()))
+    }
 }
 
-impl<'a, T, C, E, Q> Cw721Execute<T, C> for Cw721Contract<'a, T, C, E, Q>
+impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
 where
     T: Serialize + DeserializeOwned + Clone,
     C: CustomMsg,
     E: CustomMsg,
     Q: CustomMsg,
 {
-    type Err = ContractError;
-
     fn transfer_nft(
         &self,
         deps: DepsMut,
@@ -153,7 +202,7 @@ where
         info: MessageInfo,
         recipient: String,
         token_id: String,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         self._transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
         Ok(Response::new()
@@ -171,7 +220,7 @@ where
         contract: String,
         token_id: String,
         msg: Binary,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         // Transfer token
         self._transfer_nft(deps, &env, &info, &contract, &token_id)?;
 
@@ -198,7 +247,7 @@ where
         spender: String,
         token_id: String,
         expires: Option<Expiration>,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         self._update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
         Ok(Response::new()
@@ -215,7 +264,7 @@ where
         info: MessageInfo,
         spender: String,
         token_id: String,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         self._update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
         Ok(Response::new()
@@ -232,7 +281,7 @@ where
         info: MessageInfo,
         operator: String,
         expires: Option<Expiration>,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         // reject expired data as invalid
         let expires = expires.unwrap_or_default();
         if expires.is_expired(&env.block) {
@@ -256,7 +305,7 @@ where
         _env: Env,
         info: MessageInfo,
         operator: String,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         let operator_addr = deps.api.addr_validate(&operator)?;
         self.operators
             .remove(deps.storage, (&info.sender, &operator_addr));
@@ -273,7 +322,7 @@ where
         _env: Env,
         _info: MessageInfo,
         _token_id: String,
-    ) -> Result<Response<C>, ContractError> {
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
         Err(ContractError::BurnNotAllowed {})
     }
 }

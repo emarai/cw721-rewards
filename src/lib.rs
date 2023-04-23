@@ -28,16 +28,23 @@ pub type Extension = Option<Empty>;
 // Version info for migration
 pub const CONTRACT_NAME: &str = "crates.io:cw721-rewards";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const DENOM: &str = "uconst";
 
-// currently we only support migrating from 0.16.0. this is ok for now because
-// we have not released any 0.16.x where x != 0
-//
+const REWARDS_WITHDRAW_REPLY: u64 = 1001;
+
+pub use archway_bindings::types::rewards::WithdrawRewardsResponse;
+pub use archway_bindings::{ArchwayMsg, ArchwayQuery};
+pub use cosmwasm_std::{DepsMut, Reply, Response, StdError, StdResult};
+pub use cw_utils::NativeBalance;
+
 pub mod entry {
     use super::*;
 
     #[cfg(not(feature = "library"))]
     use cosmwasm_std::entry_point;
-    use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+    use cosmwasm_std::{
+        Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult,
+    };
 
     // This makes a conscious choice on the various generics used by the contract
     #[cfg_attr(not(feature = "library"), entry_point)]
@@ -59,8 +66,8 @@ pub mod entry {
         env: Env,
         info: MessageInfo,
         msg: ExecuteMsg<Extension>,
-    ) -> Result<Response, ContractError> {
-        let tract = Cw721Contract::<Extension, Empty, Empty, Empty>::default();
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
+        let tract = Cw721Contract::<Extension, ArchwayMsg, Empty, Empty>::default();
         tract.execute(deps, env, info, msg)
     }
 
@@ -68,6 +75,65 @@ pub mod entry {
     pub fn query(deps: Deps, env: Env, msg: QueryMsg<Empty>) -> StdResult<Binary> {
         let tract = Cw721Contract::<Extension, Empty, Empty, Empty>::default();
         tract.query(deps, env, msg)
+    }
+
+    #[cfg_attr(not(feature = "library"), entry_point)]
+    pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
+        match msg.id {
+            REWARDS_WITHDRAW_REPLY => rewards::after_rewards_withdrawn(deps, msg),
+            id => Err(StdError::not_found(format!("Unknown reply id: {}", id))),
+        }
+    }
+}
+
+pub mod rewards {
+
+    use cosmwasm_std::{Binary, SubMsgResponse};
+
+    use super::*;
+
+    pub fn after_rewards_withdrawn(deps: DepsMut, msg: Reply) -> StdResult<Response> {
+        let tract = Cw721Contract::<Extension, ArchwayMsg, Empty, Empty>::default();
+
+        let data = parse_reply_data(msg)?;
+        let withdraw_response: WithdrawRewardsResponse =
+            serde_json_wasm::from_slice::<WithdrawRewardsResponse>(&data.0)
+                .map_err(|e| StdError::generic_err(e.to_string()))?;
+
+        let mut rewards_balance = NativeBalance(withdraw_response.total_rewards);
+        rewards_balance.normalize();
+
+        let total_rewards: Vec<String> = rewards_balance
+            .clone()
+            .into_vec()
+            .iter()
+            .map(|coin| coin.to_string())
+            .collect();
+
+        let total_rewards_u128: u128 = rewards_balance
+            .into_vec()
+            .iter()
+            .map(|coin| coin.amount.u128())
+            .sum();
+
+        tract.add_total_arch_reward(deps.storage, total_rewards_u128)?;
+
+        let res = Response::new()
+            .add_attribute("method", "after_rewards_withdrawn")
+            .add_attribute("records_num", withdraw_response.records_num.to_string())
+            .add_attribute("total_rewards", total_rewards.concat());
+
+        Ok(res)
+    }
+
+    fn parse_reply_data(reply: Reply) -> StdResult<Binary> {
+        parse_reply_result(reply)?
+            .data
+            .ok_or_else(|| StdError::generic_err("Missing reply data".to_owned()))
+    }
+
+    fn parse_reply_result(reply: Reply) -> StdResult<SubMsgResponse> {
+        reply.result.into_result().map_err(StdError::generic_err)
     }
 }
 
