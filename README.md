@@ -1,34 +1,52 @@
-# Cw721 Basic
+# Cw721 Rewards
 
-This is a basic implementation of a cw721 NFT contract. It implements
-the [CW721 spec](../../packages/cw721/README.md) and is designed to
-be deployed as is, or imported into other contracts to easily build
-cw721-compatible NFTs with custom logic.
+This is a modified version of cw721 NFT contract. It implements
+archway-bindings to withdraw reward per token basis. The
+calculation for each token reward distribution is as follows,
 
-Implements:
-
-- [x] CW721 Base
-- [x] Metadata extension
-- [x] Enumerable extension
+```
+token_reward(token_id) = total_rewards / max_supply - claimed_rewards(token_id)
+```
 
 ## Implementation
 
-The `ExecuteMsg` and `QueryMsg` implementations follow the [CW721 spec](../../packages/cw721/README.md) and are described there.
-Beyond that, we make a few additions:
+This contract implements cw721 with added functionality, to deploy please provide the `token_uri`
+and `max_supply` to the instantiate command.
 
-* `InstantiateMsg` takes name and symbol (for metadata), as well as a **Minter** address. This is a special address that has full
-power to mint new NFTs (but not modify existing ones)
-* `ExecuteMsg::Mint{token_id, owner, token_uri}` - creates a new token with given owner and (optional) metadata. It can only be called by
-the Minter set in `instantiate`.
-* `QueryMsg::Minter{}` - returns the minter address for this contract.
+```
+'{"name":"Test Collection","symbol":"NFTEST","token_uri":"ipfs://QmejYa4kkcnCjDiZwy2YnNCY2CBBYnnxDV3V2F1Eh77iya/1.json","max_supply":777}'
+```
 
-It requires all tokens to have defined metadata in the standard format (with no extensions). For generic NFTs this may often be enough.
+After instantiating, set the contract metadata for Archway reward distribution (note: you can assign
+any other contract to the nft contract address for more rewards)
 
-The *Minter* can either be an external actor (e.g. web server, using PubKey) or another contract. If you just want to customize
-the minting behavior but not other functionality, you could extend this contract (importing code and wiring it together)
-or just create a custom contract as the owner and use that contract to Mint.
+```
+archwayd tx rewards set-contract-metadata $CONTRACT_ADDRESS --gas auto --gas-prices 0.05uconst --gas-adjustment 1.4 --from $DEPLOYER --chain-id "constantine-2" --node "https://rpc.constantine-2.archway.tech:443" --broadcast-mode sync --output json -y --owner-address $CONTRACT_ADDRESS --rewards-address $CONTRACT_ADDRESS
+```
 
-If provided, it is expected that the _token_uri_ points to a JSON file following the [ERC721 Metadata JSON Schema](https://eips.ethereum.org/EIPS/eip-721).
+Anyone can mint (freemint) the nft using the `mint` message,
+
+```
+archwayd tx wasm execute $CONTRACT_ADDRESS '{"mint":{"extension":{}}}' --from prime --chain-id "constantine-2" --node "https://rpc.constantine-2.archway.tech:443" --output json -y --gas auto --gas-prices 0.05uconst --gas-adjustment 1.4
+```
+
+After couple of txs, any account can trigger the reward withdrawal with `withdraw_rewards`
+
+```
+archwayd tx wasm execute $CONTRACT_ADDRESS '{"withdraw_rewards":{}}' --from prime --chain-id "constantine-2" --node "https://rpc.constantine-2.archway.tech:443" --output json -y --gas auto --gas-prices 0.05uconst --gas-adjustment 1.4
+```
+
+This distribute the reward to all tokens equally, as you can see with `total_arch_reward`
+
+```
+archway query contract-state smart --args '{"total_arch_reward":{"token_id":"1"}}'
+```
+
+Token owner can withdraw the reward available with `withdraw_token_rewards`,
+
+```
+archwayd tx wasm execute $CONTRACT_ADDRESS '{"withdraw_token_rewards":{"token_id":"1"}}' --from prime --chain-id "constantine-2" --node "https://rpc.constantine-2.archway.tech:443" --output json -y --gas auto --gas-prices 0.05uconst --gas-adjustment 1.4
+```
 
 ## Running this contract
 
