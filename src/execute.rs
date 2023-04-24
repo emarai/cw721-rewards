@@ -156,13 +156,15 @@ where
     pub fn withdraw_token_rewards(
         &self,
         deps: DepsMut,
-        env: Env,
+        _env: Env,
         info: MessageInfo,
         token_id: String,
     ) -> Result<Response<ArchwayMsg>, ContractError> {
         let mut token = self.tokens.load(deps.storage, &token_id)?;
         // ensure we have permissions
-        self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+        if token.owner != info.sender {
+            return Err(ContractError::Ownership(OwnershipError::NotOwner));
+        }
 
         let available_to_claim = self
             .get_total_arch_rewards(deps.as_ref(), Some(token_id.clone()))
