@@ -2,7 +2,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use cosmwasm_std::{
-    to_binary, Addr, Binary, BlockInfo, CustomMsg, Deps, Env, Order, StdError, StdResult,
+    to_binary, Addr, Binary, BlockInfo, CustomMsg, Decimal, Deps, Empty, Env, Order, StdError,
+    StdResult, Uint128,
 };
 
 use cw721::{
@@ -13,8 +14,12 @@ use cw721::{
 use cw_storage_plus::Bound;
 use cw_utils::maybe_addr;
 
-use crate::msg::{MinterResponse, QueryMsg, TotalRewardResponse};
+use crate::msg::{
+    CheckRoyaltiesResponse, Cw2981QueryMsg, MinterResponse, QueryMsg, RoyaltiesInfoResponse,
+    TotalRewardResponse,
+};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
+use crate::Extension;
 
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 100;
@@ -248,7 +253,7 @@ where
     E: CustomMsg,
     Q: CustomMsg,
 {
-    pub fn query(&self, deps: Deps, env: Env, msg: QueryMsg<Q>) -> StdResult<Binary> {
+    pub fn query(&self, deps: Deps, env: Env, msg: QueryMsg<Cw2981QueryMsg>) -> StdResult<Binary> {
         match msg {
             QueryMsg::Minter {} => to_binary(&self.minter(deps)?),
             QueryMsg::ContractInfo {} => to_binary(&self.contract_info(deps)?),
@@ -322,7 +327,13 @@ where
             QueryMsg::TotalArchReward { token_id } => {
                 to_binary(&self.get_total_arch_rewards(deps, token_id)?)
             }
-            QueryMsg::Extension { msg: _ } => Ok(Binary::default()),
+            QueryMsg::Extension { msg } => match msg {
+                Cw2981QueryMsg::RoyaltyInfo {
+                    token_id,
+                    sale_price,
+                } => to_binary(&self.query_royalties_info(deps, token_id, sale_price)?),
+                Cw2981QueryMsg::CheckRoyalties {} => to_binary(&self.check_royalties(deps)?),
+            },
         }
     }
 
@@ -362,6 +373,44 @@ where
                 total_arch_reward: total_all,
             })
         };
+    }
+    pub fn query_royalties_info(
+        &self,
+        deps: Deps,
+        token_id: String,
+        sale_price: Uint128,
+    ) -> StdResult<RoyaltiesInfoResponse> {
+        let contract = Cw721Contract::<Extension, Empty, Empty, Cw2981QueryMsg>::default();
+
+        let token_info: TokenInfo<Extension> = contract.tokens.load(deps.storage, &token_id)?;
+
+        let royalty_percentage = match token_info.extension {
+            Some(ref ext) => match ext.royalty_percentage {
+                Some(percentage) => Decimal::percent(percentage),
+                None => Decimal::percent(0),
+            },
+            None => Decimal::percent(0),
+        };
+        let royalty_from_sale_price = sale_price * royalty_percentage;
+
+        let royalty_address = match token_info.extension {
+            Some(ext) => match ext.royalty_payment_address {
+                Some(addr) => addr,
+                None => String::from(""),
+            },
+            None => String::from(""),
+        };
+
+        Ok(RoyaltiesInfoResponse {
+            address: royalty_address,
+            royalty_amount: royalty_from_sale_price,
+        })
+    }
+
+    pub fn check_royalties(&self, _deps: Deps) -> StdResult<CheckRoyaltiesResponse> {
+        Ok(CheckRoyaltiesResponse {
+            royalty_payments: true,
+        })
     }
 }
 

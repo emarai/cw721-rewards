@@ -1,5 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Binary;
+use cosmwasm_std::{CustomMsg, Uint128};
 use cw721::Expiration;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use schemars::JsonSchema;
@@ -178,4 +179,35 @@ pub struct TotalRewardResponse {
 #[cw_serde]
 pub struct MinterResponse {
     pub minter: Option<String>,
+}
+
+#[cw_serde]
+#[derive(QueryResponses)]
+pub enum Cw2981QueryMsg {
+    #[returns(RoyaltiesInfoResponse)]
+    RoyaltyInfo {
+        token_id: String,
+        sale_price: Uint128,
+    },
+    #[returns(CheckRoyaltiesResponse)]
+    CheckRoyalties {},
+}
+
+impl Default for Cw2981QueryMsg {
+    fn default() -> Self {
+        Cw2981QueryMsg::CheckRoyalties {}
+    }
+}
+
+impl CustomMsg for Cw2981QueryMsg {}
+
+#[cw_serde]
+pub struct RoyaltiesInfoResponse {
+    pub address: String,
+    pub royalty_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct CheckRoyaltiesResponse {
+    pub royalty_payments: bool,
 }

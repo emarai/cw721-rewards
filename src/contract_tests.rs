@@ -3,7 +3,7 @@
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, CosmosMsg, DepsMut, Empty, Response, StdError, WasmMsg,
+    from_binary, to_binary, CosmosMsg, DepsMut, Empty, Response, StdError, WasmMsg,
 };
 
 use cw721::{
