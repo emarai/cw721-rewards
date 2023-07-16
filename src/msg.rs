@@ -10,8 +10,8 @@ pub struct InstantiateMsg {
     pub name: String,
     /// Symbol of the NFT contract
     pub symbol: String,
-    pub max_supply: u32,
-    pub token_uri: String,
+    pub minter: String,
+    pub rewards_denom: String,
 }
 
 /// This is like Cw721ExecuteMsg but we add a Mint command for an owner
@@ -57,6 +57,9 @@ pub enum ExecuteMsg<T> {
 
     /// Mint a new NFT, can only be called by the contract minter
     Mint {
+        token_id: String,
+        owner: String,
+        token_uri: Option<String>,
         extension: T,
     },
 
@@ -64,6 +67,10 @@ pub enum ExecuteMsg<T> {
 
     WithdrawTokenRewards {
         token_id: String,
+    },
+
+    UpdateMinter {
+        minter: String,
     },
 
     /// Burn an NFT the sender has access to
@@ -171,10 +178,4 @@ pub struct TotalRewardResponse {
 #[cw_serde]
 pub struct MinterResponse {
     pub minter: Option<String>,
-}
-
-#[cw_serde]
-pub struct MintConfig {
-    pub max_supply: u32,
-    pub token_uri: String,
 }

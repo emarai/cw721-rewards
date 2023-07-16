@@ -4,15 +4,16 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use cosmwasm_std::{
-    coins, BankMsg, Binary, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
+    coins, BankMsg, Binary, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, SubMsg,
 };
 
 use cw721::{ContractInfoResponse, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MintConfig};
+use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
-use crate::{DENOM, REWARDS_WITHDRAW_REPLY};
+use crate::REWARDS_WITHDRAW_REPLY;
 
 impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
 where
@@ -28,21 +29,18 @@ where
         info: MessageInfo,
         msg: InstantiateMsg,
     ) -> StdResult<Response<C>> {
-        let minter = info.sender.clone();
+        let owner = info.sender.clone();
         let info = ContractInfoResponse {
             name: msg.name,
             symbol: msg.symbol,
         };
         self.contract_info.save(deps.storage, &info)?;
 
-        let mint_config = MintConfig {
-            max_supply: msg.max_supply,
-            token_uri: msg.token_uri,
-        };
+        self.minter
+            .save(deps.storage, &deps.api.addr_validate(&msg.minter)?)?;
+        self.rewards_denom.save(deps.storage, &msg.rewards_denom)?;
 
-        self.mint_config.save(deps.storage, &mint_config)?;
-
-        cw_ownable::initialize_owner(deps.storage, deps.api, Some(&minter.as_str()))?;
+        cw_ownable::initialize_owner(deps.storage, deps.api, Some(&owner.as_str()))?;
 
         Ok(Response::default())
     }
@@ -55,7 +53,12 @@ where
         msg: ExecuteMsg<T>,
     ) -> Result<Response<ArchwayMsg>, ContractError> {
         match msg {
-            ExecuteMsg::Mint { extension } => self.mint(deps, info, extension),
+            ExecuteMsg::Mint {
+                extension,
+                token_id,
+                owner,
+                token_uri,
+            } => self.mint(deps, info, token_id, owner, token_uri, extension),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -83,6 +86,9 @@ where
                 self.withdraw_token_rewards(deps, env, info, token_id)
             }
             ExecuteMsg::UpdateOwnership(action) => Self::update_ownership(deps, env, info, action),
+            ExecuteMsg::UpdateMinter { minter } => {
+                Self::update_minter(&self, deps, env, info, minter)
+            }
         }
     }
 }
@@ -99,24 +105,23 @@ where
         &self,
         deps: DepsMut,
         info: MessageInfo,
+        token_id: String,
+        owner: String,
+        token_uri: Option<String>,
         extension: T,
     ) -> Result<Response<ArchwayMsg>, ContractError> {
-        // create the token
-        let mint_config = self.mint_config.may_load(deps.storage)?.unwrap();
+        let minter = self.minter.load(deps.storage)?;
 
-        let token = TokenInfo {
-            owner: deps.api.addr_validate(&info.sender.as_str())?,
-            approvals: vec![],
-            token_uri: Some(mint_config.token_uri),
-            reward_claimed: 0,
-            extension: extension,
-        };
-
-        let token_id = self.token_count(deps.storage)? + 1;
-
-        if token_id > mint_config.max_supply as u64 {
-            return Err(ContractError::MaxSupplyExceeded {});
+        if minter != info.sender {
+            return Err(ContractError::Std(StdError::generic_err("Not minter")));
         }
+        let token = TokenInfo {
+            owner: deps.api.addr_validate(&owner)?,
+            approvals: vec![],
+            token_uri,
+            reward_claimed: 0,
+            extension,
+        };
 
         self.tokens
             .update(deps.storage, &token_id.to_string(), |old| match old {
@@ -141,6 +146,21 @@ where
     ) -> Result<Response<ArchwayMsg>, ContractError> {
         let ownership = cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
         Ok(Response::new().add_attributes(ownership.into_attributes()))
+    }
+
+    pub fn update_minter(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        minter: String,
+    ) -> Result<Response<ArchwayMsg>, ContractError> {
+        cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+        self.minter
+            .save(deps.storage, &deps.api.addr_validate(&minter)?)?;
+
+        Ok(Response::new())
     }
 
     pub fn withdraw_rewards(&self) -> Result<Response<ArchwayMsg>, ContractError> {
@@ -176,9 +196,10 @@ where
 
         // transfer arch as msg
 
+        let rewards_denom = self.rewards_denom.load(deps.storage)?;
         let msg = BankMsg::Send {
             to_address: info.sender.to_string(),
-            amount: coins(available_to_claim, DENOM),
+            amount: coins(available_to_claim, rewards_denom),
         };
 
         Ok(Response::new()

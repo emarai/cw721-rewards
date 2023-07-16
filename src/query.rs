@@ -327,11 +327,11 @@ where
     }
 
     pub fn minter(&self, deps: Deps) -> StdResult<MinterResponse> {
-        let minter = cw_ownable::get_ownership(deps.storage)?
-            .owner
-            .map(|a| a.into_string());
+        let minter = self.minter.load(deps.storage)?;
 
-        Ok(MinterResponse { minter })
+        Ok(MinterResponse {
+            minter: Some(minter.into_string()),
+        })
     }
 
     pub fn ownership(deps: Deps) -> StdResult<cw_ownable::Ownership<Addr>> {
@@ -352,10 +352,10 @@ where
         return if let Some(token_id) = token_id {
             let info = self.tokens.load(deps.storage, &token_id)?;
 
-            let mint_config = self.mint_config.load(deps.storage)?;
+            let total_supply = self.token_count.load(deps.storage)?;
 
             Ok(TotalRewardResponse {
-                total_arch_reward: total_all / mint_config.max_supply as u128 - info.reward_claimed,
+                total_arch_reward: total_all / total_supply as u128 - info.reward_claimed,
             })
         } else {
             Ok(TotalRewardResponse {

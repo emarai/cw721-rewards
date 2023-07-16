@@ -28,7 +28,6 @@ pub type Extension = Option<Empty>;
 // Version info for migration
 pub const CONTRACT_NAME: &str = "crates.io:cw721-rewards";
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const DENOM: &str = "uconst";
 
 const REWARDS_WITHDRAW_REPLY: u64 = 1001;
 
@@ -156,8 +155,8 @@ mod tests {
             InstantiateMsg {
                 name: "".into(),
                 symbol: "".into(),
-                max_supply: 0,
-                token_uri: "".into(),
+                minter: "larry".into(),
+                rewards_denom: "aconst".into(),
             },
         )
         .unwrap();
