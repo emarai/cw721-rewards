@@ -27,4 +27,7 @@ pub enum ContractError {
 
     #[error("Max supply exceeded")]
     MaxSupplyExceeded {},
+
+    #[error("Royalty percentage must be between 0 and 100")]
+    InvalidRoyaltyPercentage,
 }

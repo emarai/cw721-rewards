@@ -18,7 +18,7 @@
   },
   "network": {
     "name": "constantine",
-    "chainId": "constantine-2",
+    "chainId": "constantine-3",
     "type": "testnet",
     "fees": {
       "feeDenom": "uconst"
@@ -36,7 +36,7 @@
     },
     "urls": {
       "rpc": {
-        "url": "https://rpc.constantine-2.archway.tech",
+        "url": "https://rpc.constantine.archway.tech",
         "port": 443
       }
     }

@@ -1,5 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Binary;
+use cosmwasm_std::{CustomMsg, Uint128};
 use cw721::Expiration;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 use schemars::JsonSchema;
@@ -10,8 +11,8 @@ pub struct InstantiateMsg {
     pub name: String,
     /// Symbol of the NFT contract
     pub symbol: String,
-    pub max_supply: u32,
-    pub token_uri: String,
+    pub minter: String,
+    pub rewards_denom: String,
 }
 
 /// This is like Cw721ExecuteMsg but we add a Mint command for an owner
@@ -57,6 +58,9 @@ pub enum ExecuteMsg<T> {
 
     /// Mint a new NFT, can only be called by the contract minter
     Mint {
+        token_id: String,
+        owner: String,
+        token_uri: Option<String>,
         extension: T,
     },
 
@@ -64,6 +68,10 @@ pub enum ExecuteMsg<T> {
 
     WithdrawTokenRewards {
         token_id: String,
+    },
+
+    UpdateMinter {
+        minter: String,
     },
 
     /// Burn an NFT the sender has access to
@@ -174,7 +182,32 @@ pub struct MinterResponse {
 }
 
 #[cw_serde]
-pub struct MintConfig {
-    pub max_supply: u32,
-    pub token_uri: String,
+#[derive(QueryResponses)]
+pub enum Cw2981QueryMsg {
+    #[returns(RoyaltiesInfoResponse)]
+    RoyaltyInfo {
+        token_id: String,
+        sale_price: Uint128,
+    },
+    #[returns(CheckRoyaltiesResponse)]
+    CheckRoyalties {},
+}
+
+impl Default for Cw2981QueryMsg {
+    fn default() -> Self {
+        Cw2981QueryMsg::CheckRoyalties {}
+    }
+}
+
+impl CustomMsg for Cw2981QueryMsg {}
+
+#[cw_serde]
+pub struct RoyaltiesInfoResponse {
+    pub address: String,
+    pub royalty_amount: Uint128,
+}
+
+#[cw_serde]
+pub struct CheckRoyaltiesResponse {
+    pub royalty_payments: bool,
 }
