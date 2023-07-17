@@ -6,7 +6,16 @@
     "archwayd": {
       "docker": false
     },
-    "deployments": [],
+    "deployments": [
+      {
+        "project": "cw721-rewards",
+        "type": "store",
+        "chainId": "constantine-3",
+        "codeId": 781,
+        "checksum": "55f7797e785d03a9b5a883f82c0c06e19766be0d486a2a020b785924907a7ecd",
+        "txhash": "EF3F563467AE7F06B39A27CC698E439DDED6FB194926C3920102FE4D7C95F5D5"
+      }
+    ],
     "scripts": {
       "test": "cargo unit-test",
       "build": "cargo build",
@@ -21,16 +30,16 @@
     "chainId": "constantine-3",
     "type": "testnet",
     "fees": {
-      "feeDenom": "uconst"
+      "feeDenom": "aconst"
     },
     "gas": {
-      "prices": "0.002uconst",
+      "prices": "900000000000.000000000000000000aconst",
       "mode": "auto",
-      "adjustment": "1.5"
+      "adjustment": "1.4"
     },
     "wasm": {
       "bech32Hrp": "archway",
-      "archwayd": "0.1.0",
+      "archwayd": "1.0.1",
       "configDir": ".archway",
       "binary": "archwayd"
     },
