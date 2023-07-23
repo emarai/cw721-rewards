@@ -1,0 +1,1 @@
+545befe03df5f9e1a8daf904a8eb5405cf73ab2c9470e60f4614ba994e2a4198  /target/wasm32-unknown-unknown/release/cw721_rewards.wasm

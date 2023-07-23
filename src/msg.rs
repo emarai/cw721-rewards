@@ -211,3 +211,8 @@ pub struct RoyaltiesInfoResponse {
 pub struct CheckRoyaltiesResponse {
     pub royalty_payments: bool,
 }
+
+#[cw_serde]
+pub enum MigrateMsg {
+    Migrate {},
+}

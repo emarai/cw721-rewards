@@ -13,12 +13,6 @@ pub use crate::msg::{ExecuteMsg, InstantiateMsg, MinterResponse, QueryMsg};
 pub use crate::state::Cw721Contract;
 
 use cosmwasm_schema::cw_serde;
-// These types are re-exported so that contracts interacting with this
-// one don't need a direct dependency on cw_ownable to use the API.
-//
-// `Action` is used in `ExecuteMsg::UpdateOwnership`, `Ownership` is
-// used in `QueryMsg::Ownership`, and `OwnershipError` is used in
-// `ContractError::Ownership`.
 pub use cw_ownable::{Action, Ownership, OwnershipError};
 
 use cosmwasm_std::Empty;
@@ -60,7 +54,7 @@ pub struct Metadata {
 pub type Extension = Option<Metadata>;
 
 pub mod entry {
-    use crate::msg::Cw2981QueryMsg;
+    use crate::msg::{Cw2981QueryMsg, MigrateMsg};
 
     use super::*;
 
@@ -123,6 +117,11 @@ pub mod entry {
             REWARDS_WITHDRAW_REPLY => rewards::after_rewards_withdrawn(deps, msg),
             id => Err(StdError::not_found(format!("Unknown reply id: {}", id))),
         }
+    }
+
+    #[cfg_attr(not(feature = "library"), entry_point)]
+    pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+        Ok(Response::default())
     }
 }
 
